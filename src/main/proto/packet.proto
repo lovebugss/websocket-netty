@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package com.itrjp.demo.proto;
+option java_outer_classname = "PacketProtobuf";
+
+
+message Data{
+  DataType type = 1; // 数据类型
+  int64 timestamp = 2; // 时间戳
+  string content = 4; // 内容
+}
+
+enum DataType{
+  message = 0; // 消息
+  notion = 1; // 通知
+}
