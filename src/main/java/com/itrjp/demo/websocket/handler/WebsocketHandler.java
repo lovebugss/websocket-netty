@@ -118,9 +118,9 @@ public class WebsocketHandler extends SimpleChannelInboundHandler<Object> {
                     byteBuf.retain();
                     out.add(text.content());
                 }else if (msg instanceof PingWebSocketFrame) {
-                    pingListener.onPing(null);
+                    pingListener.onPing(ctx.channel());
                 } else if (msg instanceof PongWebSocketFrame) {
-                    pongListener.onPong(null);
+                    pongListener.onPong(ctx.channel());
                 }
             }
         });
@@ -133,7 +133,7 @@ public class WebsocketHandler extends SimpleChannelInboundHandler<Object> {
     }
 
     private void connectClient(Channel channel) {
-        openListener.onOpen(null);
+        openListener.onOpen(channel);
     }
 
     private String getWebSocketLocation(FullHttpRequest req) {

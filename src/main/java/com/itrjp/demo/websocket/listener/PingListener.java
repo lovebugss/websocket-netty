@@ -1,6 +1,6 @@
 package com.itrjp.demo.websocket.listener;
 
-import com.itrjp.demo.websocket.WebSocketClient;
+import io.netty.channel.Channel;
 
 /**
  * TODO
@@ -9,5 +9,5 @@ import com.itrjp.demo.websocket.WebSocketClient;
  * @date 2022/7/20 19:01
  */
 public interface PingListener {
-    void onPing(WebSocketClient webSocketClient);
+    void onPing(Channel channel);
 }

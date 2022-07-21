@@ -1,7 +1,7 @@
 package com.itrjp.demo.websocket.listener;
 
 import com.itrjp.demo.proto.PacketProtobuf;
-import com.itrjp.demo.websocket.WebSocketClient;
+import io.netty.channel.Channel;
 
 /**
  * TODO
@@ -11,5 +11,5 @@ import com.itrjp.demo.websocket.WebSocketClient;
  */
 public interface MessageListener {
 
-    void onMessage(WebSocketClient webSocketClient, PacketProtobuf.Data protobuf);
+    void onMessage(Channel channel, PacketProtobuf.Data protobuf);
 }

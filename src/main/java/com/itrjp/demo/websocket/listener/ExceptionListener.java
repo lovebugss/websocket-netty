@@ -1,6 +1,6 @@
 package com.itrjp.demo.websocket.listener;
 
-import com.itrjp.demo.websocket.WebSocketClient;
+import io.netty.channel.Channel;
 
 /**
  * TODO
@@ -9,5 +9,5 @@ import com.itrjp.demo.websocket.WebSocketClient;
  * @date 2022/7/21 13:45
  */
 public interface ExceptionListener {
-    void onException(WebSocketClient client, Throwable throwable);
+    void onException(Channel channel, Throwable throwable);
 }

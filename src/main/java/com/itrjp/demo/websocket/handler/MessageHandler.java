@@ -42,7 +42,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<PacketProtobuf.D
                 .setContent("你好!!!")
                 .setType(PacketProtobuf.DataType.message)
                 .build());
-        messageListener.onMessage(null, msg);
+        messageListener.onMessage(channel, msg);
     }
 
     /**
@@ -54,14 +54,14 @@ public class MessageHandler extends SimpleChannelInboundHandler<PacketProtobuf.D
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         logger.error("exceptionCaught", cause);
-        exceptionListener.onException(null, cause);
+        exceptionListener.onException(ctx.channel(), cause);
         ctx.close();
     }
 
     //断开长链接
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        closeListener.onClose(null);
+        closeListener.onClose(ctx.channel());
         super.channelInactive(ctx);
     }
 
