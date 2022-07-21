@@ -28,15 +28,18 @@ public class WebSocketServerInitializer extends ChannelInitializer<Channel> {
     private static final String HTTP_SERVER_CODEC = "HttpServerCodec";
     public static final String AUTHORIZE_HANDLER = "authorizeHandler";
     public static final String WEBSOCKET_HANDLER = "websocketHandler";
-    private Configuration configuration;
+    private WebSocketProperties webSocketProperties;
     private SslContext sslContext;
 
-    private AuthorizeHandler authorizeHandler;
-    private WebsocketHandler websocketHandler;
-    private MessageHandler messageHandler;
+    private final AuthorizeHandler authorizeHandler;
+    private final WebsocketHandler websocketHandler;
+    private final MessageHandler messageHandler;
     private final AuthorizationListener authorization;
 
-    public WebSocketServerInitializer(AuthorizationListener authorization) {
+    public WebSocketServerInitializer(AuthorizeHandler authorizeHandler, WebsocketHandler websocketHandler, MessageHandler messageHandler, AuthorizationListener authorization) {
+        this.authorizeHandler = authorizeHandler;
+        this.websocketHandler = websocketHandler;
+        this.messageHandler = messageHandler;
         this.authorization = authorization;
     }
 
@@ -52,7 +55,7 @@ public class WebSocketServerInitializer extends ChannelInitializer<Channel> {
 
     private void addWebsocketHandler(ChannelPipeline pipeline) {
         pipeline.addLast(HTTP_SERVER_CODEC, new HttpServerCodec());
-        pipeline.addLast(new HttpObjectAggregator(configuration.getHttpMaxContextLength()));
+        pipeline.addLast(new HttpObjectAggregator(webSocketProperties.getHttpMaxContextLength()));
 
         // 鉴权
         pipeline.addLast(AUTHORIZE_HANDLER, authorizeHandler);
@@ -64,18 +67,15 @@ public class WebSocketServerInitializer extends ChannelInitializer<Channel> {
     /**
      * 初始化
      *
-     * @param configuration
+     * @param webSocketProperties
      */
-    public void initialization(Configuration configuration) {
-        this.configuration = configuration;
+    public void initialization(WebSocketProperties webSocketProperties) {
+        this.webSocketProperties = webSocketProperties;
 
-        Configuration.SSLConfig sslConfig = configuration.getSsl();
+        WebSocketProperties.SSLConfig sslConfig = webSocketProperties.getSsl();
         if (sslConfig.isEnable()) {
             sslContext = createSSLContext(sslConfig);
         }
-        authorizeHandler = new AuthorizeHandler(configuration, authorization);
-        websocketHandler = new WebsocketHandler(configuration, openListener);
-        messageHandler = new MessageHandler();
     }
 
     /**
@@ -85,7 +85,7 @@ public class WebSocketServerInitializer extends ChannelInitializer<Channel> {
      * @param sslConfig
      * @return
      */
-    private SslContext createSSLContext(Configuration.SSLConfig sslConfig) {
+    private SslContext createSSLContext(WebSocketProperties.SSLConfig sslConfig) {
         try {
             SelfSignedCertificate ssc = new SelfSignedCertificate();
             return SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();

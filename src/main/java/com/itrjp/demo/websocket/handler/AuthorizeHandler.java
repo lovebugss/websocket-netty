@@ -1,21 +1,20 @@
 package com.itrjp.demo.websocket.handler;
 
-import com.itrjp.demo.websocket.listener.AuthorizationListener;
-import com.itrjp.demo.websocket.Configuration;
 import com.itrjp.demo.websocket.HandshakeData;
+import com.itrjp.demo.websocket.WebSocketProperties;
+import com.itrjp.demo.websocket.listener.AuthorizationListener;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
 import static io.netty.handler.codec.http.HttpMethod.GET;
-import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
-import static io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN;
-import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import static io.netty.handler.codec.http.HttpResponseStatus.*;
 
 /**
  * TODO
@@ -23,14 +22,15 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
  * @author <a href="mailto:r979668507@gmail.com">renjp</a>
  * @date 2022/7/11 17:26
  */
+@Component
 @ChannelHandler.Sharable
 public class AuthorizeHandler extends ChannelInboundHandlerAdapter {
     private final Logger logger = LoggerFactory.getLogger(AuthorizeHandler.class);
-    private final Configuration configuration;
+    private final WebSocketProperties webSocketProperties;
     private final AuthorizationListener authorization;
 
-    public AuthorizeHandler(Configuration configuration, AuthorizationListener authorization) {
-        this.configuration = configuration;
+    public AuthorizeHandler(WebSocketProperties webSocketProperties, AuthorizationListener authorization) {
+        this.webSocketProperties = webSocketProperties;
         this.authorization = authorization;
     }
 
@@ -78,13 +78,9 @@ public class AuthorizeHandler extends ChannelInboundHandlerAdapter {
             HandshakeData handshakeData = new HandshakeData(parameters, request.uri());
             logger.info("AuthorizeHandler#channelRead: FullHttpRequest");
             boolean authorize = authorization.authorize(handshakeData);
-            if (!authorize) {
-                // 鉴权成功
-                HttpResponse res = new DefaultHttpResponse(HTTP_1_1, HttpResponseStatus.UNAUTHORIZED);
-                channel.writeAndFlush(res).addListener(ChannelFutureListener.CLOSE);
-                logger.info("unauthorized, data: {}", handshakeData);
-                request.release();
-                return;
+            if (!queryString.uri().startsWith(webSocketProperties.getWebsocketPath()) || !authorize) {
+                // 鉴权失败
+                sendHttpResponse(ctx, request, new DefaultFullHttpResponse(request.protocolVersion(), UNAUTHORIZED, ctx.alloc().buffer(0)));
             }
         }
         ctx.fireChannelRead(msg);

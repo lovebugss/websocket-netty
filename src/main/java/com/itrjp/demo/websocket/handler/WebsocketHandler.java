@@ -1,18 +1,18 @@
 package com.itrjp.demo.websocket.handler;
 
-import com.google.protobuf.MessageLiteOrBuilder;
 import com.itrjp.demo.proto.PacketProtobuf;
-import com.itrjp.demo.websocket.Configuration;
 import com.itrjp.demo.websocket.ProtobufToWebSocketFrameEncode;
-import com.itrjp.demo.websocket.listener.OpenListener;
-import io.netty.buffer.Unpooled;
+import com.itrjp.demo.websocket.WebSocketFrameToProtobufDecoder;
+import com.itrjp.demo.websocket.WebSocketProperties;
+import com.itrjp.demo.websocket.listener.*;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
+import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.*;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
-import io.netty.handler.codec.protobuf.ProtobufEncoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32LengthFieldPrepender;
 import io.netty.handler.stream.ChunkedWriteHandler;
@@ -32,38 +32,37 @@ import static com.itrjp.demo.websocket.WebSocketServerInitializer.AUTHORIZE_HAND
  */
 @Component
 @ChannelHandler.Sharable
-public class WebsocketHandler extends ChannelInboundHandlerAdapter {
+public class WebsocketHandler extends SimpleChannelInboundHandler<Object> {
     private final Logger logger = LoggerFactory.getLogger(WebsocketHandler.class);
 
-    private static final String WEBSOCKET_PATH = "/ws";
-    private final Configuration configuration;
+    private final WebSocketProperties webSocketProperties;
     private final OpenListener openListener;
+    private final MessageHandler messageHandler;
+    private final PingListener pingListener;
+    private final PongListener pongListener;
+    private final ExceptionListener exceptionListener;
+    private final CloseListener closeListener;
 
-    public WebsocketHandler(Configuration configuration, OpenListener openListener) {
-        this.configuration = configuration;
+    public WebsocketHandler(WebSocketProperties webSocketProperties, OpenListener openListener,
+                            MessageHandler messageHandler, PingListener pingListener, PongListener pongListener,
+                            ExceptionListener exceptionListener, CloseListener closeListener) {
+        this.webSocketProperties = webSocketProperties;
         this.openListener = openListener;
+        this.messageHandler = messageHandler;
+        this.pingListener = pingListener;
+        this.pongListener = pongListener;
+        this.exceptionListener = exceptionListener;
+        this.closeListener = closeListener;
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
         logger.info("WebsocketHandler#channelRead, channel: [{}], message class: [{}]", ctx.channel().id(), msg.getClass());
         if (msg instanceof CloseWebSocketFrame) {
             logger.info("WebsocketHandler#channelRead CloseWebSocketFrame");
             ctx.channel().writeAndFlush(msg).addListener(ChannelFutureListener.CLOSE);
-        } else if (msg instanceof BinaryWebSocketFrame
-                || msg instanceof TextWebSocketFrame) {
-            logger.info("WebsocketHandler#channelRead TextWebSocketFrame");
-//            ctx.pipeline().fireChannelRead(msg);
-            ctx.fireChannelRead(msg);
         } else if (msg instanceof FullHttpRequest req) {
-            try {
-                // 升级为websocket 协议
-                handleHttpRequest(ctx, req);
-            } finally {
-//                req.release();
-            }
-        } else {
-            ctx.fireChannelRead(msg);
+            handleHttpRequest(ctx, req);
         }
     }
 
@@ -74,7 +73,7 @@ public class WebsocketHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void handshake(ChannelHandlerContext ctx, FullHttpRequest req, Channel channel) {
-        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), null, true, this.configuration.getMaxFramePayloadLength());
+        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), null, true, this.webSocketProperties.getMaxFramePayloadLength());
         final WebSocketServerHandshaker handshake = wsFactory.newHandshaker(req);
         if (handshake == null) {
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(channel);
@@ -88,6 +87,7 @@ public class WebsocketHandler extends ChannelInboundHandlerAdapter {
                     connectClient(channel);
                 } else {
                     logger.info("handshake failed");
+                    handshake.close(channel, new CloseWebSocketFrame());
                 }
             });
         }
@@ -105,20 +105,31 @@ public class WebsocketHandler extends ChannelInboundHandlerAdapter {
         pipeline.addLast(new ProtobufVarint32LengthFieldPrepender());
 
         //将WebSocketFrame转为ByteBuf 以便后面的 ProtobufDecoder 解码
-        pipeline.addLast(new ProtobufToWebSocketFrameEncode());
+        pipeline.addLast(new MessageToMessageDecoder<WebSocketFrame>(){
+            @Override
+            protected void decode(ChannelHandlerContext ctx, WebSocketFrame msg, List<Object> out) throws Exception {
+                ByteBuf byteBuf = msg.content();
+                if (msg instanceof BinaryWebSocketFrame) {
+                    // 二进制消息
+                    byteBuf.retain();
+                    out.add(msg.content());
+                } else if (msg instanceof TextWebSocketFrame text) {
+                    // 二进制消息
+                    byteBuf.retain();
+                    out.add(text.content());
+                }else if (msg instanceof PingWebSocketFrame) {
+                    pingListener.onPing(null);
+                } else if (msg instanceof PongWebSocketFrame) {
+                    pongListener.onPong(null);
+                }
+            }
+        });
 
         pipeline.addLast(new ProtobufDecoder(PacketProtobuf.Data.getDefaultInstance()));
         //自定义入站处理
-        pipeline.addLast(new MessageHandler());
+        pipeline.addLast(messageHandler);
         //出站处理 将protoBuf实例转为WebSocketFrame
-        pipeline.addLast(new ProtobufEncoder() {
-            @Override
-            protected void encode(ChannelHandlerContext ctx, MessageLiteOrBuilder msg, List<Object> out) throws Exception {
-                PacketProtobuf.Data mpMsg = (PacketProtobuf.Data) msg;
-                WebSocketFrame frame = new BinaryWebSocketFrame(Unpooled.wrappedBuffer(mpMsg.toByteArray()));
-                out.add(frame);
-            }
-        });
+        pipeline.addLast(new ProtobufToWebSocketFrameEncode());
     }
 
     private void connectClient(Channel channel) {
@@ -126,8 +137,8 @@ public class WebsocketHandler extends ChannelInboundHandlerAdapter {
     }
 
     private String getWebSocketLocation(FullHttpRequest req) {
-        String location = req.headers().get(HttpHeaderNames.HOST) + WEBSOCKET_PATH;
-        if (configuration.getSsl().isEnable()) {
+        String location = req.headers().get(HttpHeaderNames.HOST) + webSocketProperties.getWebsocketPath();
+        if (webSocketProperties.getSsl().isEnable()) {
             return "wss://" + location;
         } else {
             return "ws://" + location;

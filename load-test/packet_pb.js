@@ -72,7 +72,7 @@ proto.Data.toObject = function(includeInstance, msg) {
   var f, obj = {
     type: jspb.Message.getFieldWithDefault(msg, 1, 0),
     timestamp: jspb.Message.getFieldWithDefault(msg, 2, 0),
-    content: jspb.Message.getFieldWithDefault(msg, 4, "")
+    content: jspb.Message.getFieldWithDefault(msg, 3, "")
   };
 
   if (includeInstance) {
@@ -117,7 +117,7 @@ proto.Data.deserializeBinaryFromReader = function(msg, reader) {
       var value = /** @type {number} */ (reader.readInt64());
       msg.setTimestamp(value);
       break;
-    case 4:
+    case 3:
       var value = /** @type {string} */ (reader.readString());
       msg.setContent(value);
       break;
@@ -167,7 +167,7 @@ proto.Data.serializeBinaryToWriter = function(message, writer) {
   f = message.getContent();
   if (f.length > 0) {
     writer.writeString(
-      4,
+      3,
       f
     );
   }
@@ -211,11 +211,11 @@ proto.Data.prototype.setTimestamp = function(value) {
 
 
 /**
- * optional string content = 4;
+ * optional string content = 3;
  * @return {string}
  */
 proto.Data.prototype.getContent = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 4, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 3, ""));
 };
 
 
@@ -224,7 +224,7 @@ proto.Data.prototype.getContent = function() {
  * @return {!proto.Data} returns this
  */
 proto.Data.prototype.setContent = function(value) {
-  return jspb.Message.setProto3StringField(this, 4, value);
+  return jspb.Message.setProto3StringField(this, 3, value);
 };
 
 

@@ -3,9 +3,7 @@ package com.itrjp.demo.websocket;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
-import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,10 +23,14 @@ public class WebSocketFrameToProtobufDecoder extends MessageToMessageDecoder<Web
         log.info("method: [decode], channelId: {}, class: {}", ctx.channel().id().asLongText(), msg.getClass());
 
         ByteBuf byteBuf = msg.content();
-        if (msg instanceof BinaryWebSocketFrame || msg instanceof TextWebSocketFrame) {
+        if (msg instanceof BinaryWebSocketFrame) {
             // 二进制消息
             byteBuf.retain();
             out.add(msg.content());
+        } else if (msg instanceof TextWebSocketFrame text) {
+            // 二进制消息
+            byteBuf.retain();
+            out.add(text.content());
         }
     }
 }

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+
+    <meta charset="utf-8"/>
+
+    <title>Demo Chat</title>
+
+    <link href="css/bootstrap.css" rel="stylesheet">
+
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        #console {
+            height: 400px;
+            overflow: auto;
+        }
+
+        .username-msg {
+            color: orange;
+        }
+
+        .connect-msg {
+            color: green;
+        }
+
+        .disconnect-msg {
+            color: red;
+        }
+
+        .send-msg {
+            color: #888
+        }
+    </style>
+
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <script src="http://cdn.staticfile.org/moment.js/2.24.0/moment.js"></script>
+    <script src="/js/protobuf.min.js"></script>
+
+    <script>
+
+        let cusMessage;
+
+        /**
+         * 初始化 cusMessage
+         * @param fileName
+         * @param className
+         */
+        function initCusMsg(fileName, className) {
+            console.log("init cusMsg")
+            return protobuf.load(fileName)
+                .then((root) => {
+                    cusMessage = root.lookupType(className);
+                    return cusMessage;
+                });
+        }
+
+        var userName = 'user' + Math.floor((Math.random() * 1000) + 1);
+        let room_id = "r_111111"
+
+        var ws = new WebSocket("ws://localhost:18080/ws?cid=" + room_id + "&userId=" + userName);
+
+        ws.onopen = function (evt) {
+            console.log("Connection open ...");
+            let cusMsgPromise = initCusMsg("packet.proto", "Data");
+
+            cusMsgPromise.then((cusMsg) => {
+                //参考 https://github.com/protobufjs/protobuf.js#using-proto-files
+                //
+                // // Exemplary payload
+                // let cuTime = new Date().getTime();
+                // let payload = {seq: 0, type: 0, content: "test", timestamp: new Date().getTime()};
+                // // Verify the payload if necessary (i.e. when possibly incomplete or invalid)
+                // let errMsg = cusMsg.verify(payload);
+                // if (errMsg) {
+                //     throw Error(errMsg);
+                // }
+                // // Create a new message
+                // let message = cusMsg.create(payload); // or use .fromObject if conversion is necessary
+                // // Encode a message to an Uint8Array (browser) or Buffer (node)
+                // buffer = cusMsg.encode(message).finish();
+                //
+                // ws.send(buffer);
+            });
+        };
+
+        ws.onmessage = function (event) {
+            let reader = new FileReader();
+            reader.readAsArrayBuffer(event.data);
+            reader.onload = () => {
+                let arrayBuffer = reader.result;
+                let buffer = new Uint8Array(arrayBuffer);
+
+                let resObject = cusMessage.decode(buffer);
+                console.log("Received Message: ", resObject);
+                switch (resObject.type) {
+                    case 0:
+                        output('<span class="username-msg">' + resObject.from + ':</span> ' + resObject.content);
+                        break;
+                    case 4:
+                        let notice = resObject.notice
+                        switch (notice.type) {
+                            case 0:
+                                output('<span class="username-msg">' + resObject.from + ':</span> ' + " joind.");
+                                break;
+                            case 1:
+                                output('<span class="username-msg">' + resObject.from + ':</span> ' + " leaved.");
+                                break;
+                        }
+                        break
+                }
+                // var data = JSON.parse(evt.data)
+
+            };
+        };
+
+        ws.onclose = function (evt) {
+            console.log("Connection closed.");
+        };
+
+        function sendDisconnect() {
+            socket.disconnect();
+        }
+
+        var i = 1;
+
+        function sendMessage() {
+            var message = $('#msg').val();
+            $('#msg').val('');
+            let payload = {
+                type: 0,
+                content: message,
+                timestamp: new Date().getTime(),
+            };
+            console.log(`payload: ${JSON.stringify(payload)}`)
+            let data = cusMessage.create(payload); // or use .fromObject if conversion is necessary
+            buffer = cusMessage.encode(data).finish();
+            ws.send(buffer);
+        }
+
+        function output(message) {
+            var currentTime = "<span class='time'>" + new Date() + "</span>";
+            var element = $("<div>" + currentTime + " " + message + "</div>");
+            $('#console').prepend(element);
+        }
+    </script>
+</head>
+
+<body>
+
+<h1>Chat</h1>
+
+<br/>
+<div style="display: flex;height: 400px">
+    <div class="chat well" style="margin-right: 12px;width: 95%">
+        <h1>Chat</h1>
+        <div id="console">
+        </div>
+    </div>
+</div>
+
+
+<form class="well form-inline" onsubmit="return false;">
+    <input id="msg" class="input-xlarge" type="text" placeholder="Type something..."/>
+    <button type="button" onClick="sendMessage()" class="btn" id="send">Send</button>
+    <button type="button" onClick="sendDisconnect()" class="btn">Disconnect</button>
+</form>
+
+
+</body>
+
+</html>

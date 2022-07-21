@@ -1,6 +1,5 @@
 syntax = "proto3";
 
-package com.itrjp.demo.proto;
 option java_outer_classname = "PacketProtobuf";
 
 

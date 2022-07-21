@@ -20,8 +20,8 @@ export default () => {
             message_proto.setContent("你好")
             message_proto.setType(proto.DataType.MESSAGE)
             message_proto.setTimestamp(Math.round(new Date()))
-            socket.send(message_proto.serializeBinary());
-            console.log(`send message: ${message_proto}`)
+            console.log(`send message: ${message_proto.serializeBinary()}`)
+            socket.sendBinary(message_proto.serializeBinary().buffer);
             socket.setInterval(function timeout() {
                 socket.ping();
                 console.log('Pinging every 1sec (setInterval test)');
@@ -33,6 +33,10 @@ export default () => {
         socket.on('message', function (message) {
             console.log(`Received message: ${message}`);
         });
+        socket.on('binaryMessage', function (message) {
+              // msg is an ArrayBuffer, so we can wrap it in a typed array directly.
+               console.log(`Received binaryMessage: ${message}`);
+            });
         socket.on('close', () => console.log('disconnected'));
 
         socket.on('error', (e) => {

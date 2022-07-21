@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.net.InetSocketAddress;
+
 /**
  * TODO
  *
@@ -22,19 +24,23 @@ import org.springframework.stereotype.Component;
 public class WebSocketServer {
     private final Logger logger = LoggerFactory.getLogger(WebSocketServer.class);
 
-    private final Configuration configuration;
+    private final WebSocketProperties webSocketProperties;
+    private final WebSocketServerInitializer serverInitializer;
+
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
-    private final WebSocketServerInitializer serverInitializer;
 
     Class<? extends ServerChannel> channelClass;
 
-    public WebSocketServer(Configuration configuration, WebSocketServerInitializer serverInitializer) {
-        this.configuration = configuration;
+    public WebSocketServer(WebSocketProperties webSocketProperties, WebSocketServerInitializer serverInitializer) {
+        this.webSocketProperties = webSocketProperties;
         this.serverInitializer = serverInitializer;
     }
 
 
+    /**
+     * 启动
+     */
     public void start() {
         startAsync().awaitUninterruptibly();
     }
@@ -43,23 +49,30 @@ public class WebSocketServer {
         initialization();
 
         ServerBootstrap b = new ServerBootstrap();
-        b.group(bossGroup, workerGroup).channel(channelClass).handler(new LoggingHandler(LogLevel.INFO)).childHandler(serverInitializer);
+        b.group(bossGroup, workerGroup)
+                .channel(channelClass)
+                .handler(new LoggingHandler(LogLevel.INFO))
+                .childHandler(serverInitializer);
 
-        int port = configuration.getPort();
-        return b.bind(port).addListener((future) -> {
-            if (future.isSuccess()) {
-                logger.info("Websocket server started at port: {}", port);
-            } else {
-                logger.info("Websocket server start failed at port: {}, error: {}", port, future.cause().getMessage());
-            }
-        });
+        InetSocketAddress addr = new InetSocketAddress(webSocketProperties.getPort());
+        if (webSocketProperties.getHost() != null) {
+            addr = new InetSocketAddress(webSocketProperties.getHost(), webSocketProperties.getPort());
+        }
+        return b.bind(addr)
+                .addListener((future) -> {
+                    if (future.isSuccess()) {
+                        logger.info("Websocket server started at port: {}", webSocketProperties.getPort());
+                    } else {
+                        logger.info("Websocket server start failed at port: {}, error: {}", webSocketProperties.getPort(), future.cause().getMessage());
+                    }
+                });
     }
 
     private void initialization() {
-        bossGroup = new NioEventLoopGroup(configuration.getBossNum());
-        workerGroup = new NioEventLoopGroup(configuration.getWorkNum());
+        bossGroup = new NioEventLoopGroup(webSocketProperties.getBossNum());
+        workerGroup = new NioEventLoopGroup(webSocketProperties.getWorkNum());
         channelClass = NioServerSocketChannel.class;
-        serverInitializer.initialization(configuration);
+        serverInitializer.initialization(webSocketProperties);
     }
 
     public void stop() {

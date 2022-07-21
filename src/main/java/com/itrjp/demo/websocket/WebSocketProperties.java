@@ -9,9 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @date 2022/7/11 15:57
  */
 @ConfigurationProperties("im")
-public class Configuration {
+public class WebSocketProperties {
     private int bossNum = 0;
     private int workNum = 0;
+    private String websocketPath = "/ws";
 
     private int httpMaxContextLength = 65535;
     private int maxFramePayloadLength = 65535;
@@ -74,6 +75,14 @@ public class Configuration {
 
     public void setMaxFramePayloadLength(int maxFramePayloadLength) {
         this.maxFramePayloadLength = maxFramePayloadLength;
+    }
+
+    public String getWebsocketPath() {
+        return websocketPath;
+    }
+
+    public void setWebsocketPath(String websocketPath) {
+        this.websocketPath = websocketPath;
     }
 
     public static class SSLConfig {
